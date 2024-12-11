@@ -291,6 +291,26 @@ func schemaV2TypeFromCtyType(typ cty.Type, schema *schemav2.Schema) error { //no
 		schema.ConfigMode = configMode
 		schema.Type = collectionToV2SchemaType(typ)
 		schema.Elem = elemType
+	case typ.IsObjectType():
+		configMode = schemav2.SchemaConfigModeAttr
+		res := &schemav2.Resource{}
+		res.Schema = make(map[string]*schemav2.Schema, len(typ.AttributeTypes()))
+		for key, attrTyp := range typ.AttributeTypes() {
+			sch := &schemav2.Schema{
+				Computed: schema.Computed,
+				Optional: schema.Optional,
+			}
+			if typ.AttributeOptional(key) {
+				sch.Optional = true
+			}
+			if err := schemaV2TypeFromCtyType(attrTyp, sch); err != nil {
+				return err
+			}
+			res.Schema[key] = sch
+		}
+		schema.Elem = res
+		schema.ConfigMode = configMode
+		schema.Type = schemav2.TypeMap
 	case typ.IsTupleType():
 		return errors.New("cannot convert cty TupleType to schema v2 type")
 	case typ.Equals(cty.DynamicPseudoType):
